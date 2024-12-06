@@ -1,0 +1,320 @@
+---
+title: "Advance Data Analysis Final Project"
+author: "Nana Afia"
+date: "2024-12-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("haven")
+library("tidyverse")
+
+# Downloading 2022 Behavioral Risk Factor Surveillance System (BRFSS) data
+temp <- tempfile(fileext = ".zip")
+download.file(url = "https://www.cdc.gov/brfss/annual_data/2022/files/LLCP2022XPT.zip",destfile = temp)
+
+# Opening the downloaded temporary file and naming it as BRFSS_2022
+BRFSS_2022<- read_xpt(file = temp)
+
+# Clean up temporary file
+unlink(temp)
+```
+
+```{r}
+#Select relevant variables to the research question
+
+library(dplyr)
+
+BRFSS_2022_SmallPracticals <- BRFSS_2022[, c("DRNK3GE5", "_AGEG5YR", "_SEX", "_IMPRACE", "_BMI5CAT", "EXERANY2", "SMOKDAY2", "_HLTHPLN")]
+  
+
+# View the first few rows
+head(BRFSS_2022_SmallPracticals)
+```
+
+```{r}
+
+
+# clean the BRFSS_2022_SmallPracticals dataset
+
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals %>%
+  filter(
+    !DRNK3GE5 %in% c(88, 77, 99) & !is.na(DRNK3GE5),        # Remove specified values and NAs from DRNK3GE5
+    `_HLTHPLN` != 9 & !is.na(`_HLTHPLN`),                  # Remove 9 and NAs from _HLTHPLN
+    !EXERANY2 %in% c(7, 9) & !is.na(EXERANY2),             # Remove 7, 9, and NAs from EXERANY2
+    !SMOKDAY2 %in% c(7, 9) & !is.na(SMOKDAY2)              # Remove 7, 9, and NAs from SMOKDAY2
+  )
+
+# View the cleaned dataset
+head(BRFSS_2022_SmallPracticals_clean100)
+
+# Optionally check the number of rows removed
+removed_rows <- nrow(BRFSS_2022_SmallPracticals) - nrow(BRFSS_2022_SmallPracticals_clean100)
+cat("Number of rows removed:", removed_rows, "\n")
+
+
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  mutate(
+    `_AGEG5YR` = case_when(
+      `_AGEG5YR` == 1 ~ "18-24 years",                     # Keep "1" as is
+      `_AGEG5YR` %in% 2:3 ~ "25-34 years",                 # Merge "2-3"
+      `_AGEG5YR` %in% 4:5 ~ "35-44 years",                 # Merge "4-5"
+      `_AGEG5YR` %in% 6:7 ~ "45-54 years",                 # Merge "6-7"
+      `_AGEG5YR` %in% 8:9 ~ "55-64 years",                 # Merge "8-9"
+      `_AGEG5YR` %in% 10:13 ~ "65 years and older",        # Merge "10-13"
+      `_AGEG5YR` == 14 ~ NA_character_,                   # Remove "14" by assigning NA
+      TRUE ~ NA_character_                                # Catch-all for unexpected values
+    )
+  ) %>%
+  filter(!is.na(`_AGEG5YR`))  # Remove rows where _AGEG5YR is NA
+
+# Verify the changes
+table(BRFSS_2022_SmallPracticals_clean100$`_AGEG5YR`)
+
+
+```
+
+```{r}
+# Remove blanks in _BMI5CAT
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  filter(
+    !(`_BMI5CAT` == "" | is.na(`_BMI5CAT`))  # Exclude rows where _BMI5CAT is blank or NA
+  )
+
+# Verify changes
+table(BRFSS_2022_SmallPracticals_clean100$`_BMI5CAT`, useNA = "ifany")
+```
+
+```{r}
+# Impute and recode DRNK3GE5
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  mutate(
+    DRNK3GE5_recoded = case_when(
+      DRNK3GE5 %in% 1:20 ~ "Mild Binge Drinking",       # Merge "1-20" as Mild Binge Drinking
+      DRNK3GE5 %in% 21:40 ~ "Moderate Binge Drinking",  # Merge "21-40" as Moderate Binge Drinking
+      DRNK3GE5 %in% 41:76 ~ "Heavy Binge Drinking",     # Merge "41-76" as Heavy Binge Drinking
+      TRUE ~ NA_character_                              # Assign NA for any other values
+    )
+  )
+
+# Verify the changes
+table(BRFSS_2022_SmallPracticals_clean100$DRNK3GE5_recoded, useNA = "ifany")
+
+```
+
+```{r}
+# Recode _SEX
+
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  mutate(
+    `_SEX_recoded` = case_when(
+      `_SEX` == 1 ~ "Male",     # Keep "1" as Male
+      `_SEX` == 2 ~ "Female",   # Keep "2" as Female
+      TRUE ~ NA_character_      # Assign NA for any unexpected values
+    )
+  )
+
+# Verify the changes
+table(BRFSS_2022_SmallPracticals_clean100$`_SEX_recoded`, useNA = "ifany")
+
+# Recode variables in BRFSS_2022_SmallPracticals_clean100
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  mutate(
+    # 1. _IMPRACE
+    `_IMPRACE_recoded` = case_when(
+      `_IMPRACE` == 1 ~ "White, Non-Hispanic",
+      `_IMPRACE` == 2 ~ "Black, Non-Hispanic",
+      `_IMPRACE` == 3 ~ "Asian, Non-Hispanic",
+      `_IMPRACE` == 4 ~ "American Indian/Alaskan Native, Non-Hispanic",
+      `_IMPRACE` == 5 ~ "Hispanic",
+      `_IMPRACE` == 6 ~ "Other race, Non-Hispanic",
+      TRUE ~ NA_character_
+    ),
+    
+    # 2. _BMI5CAT
+    `_BMI5CAT_recoded` = case_when(
+      `_BMI5CAT` == 1 ~ "Underweight",
+      `_BMI5CAT` == 2 ~ "Normal Weight",
+      `_BMI5CAT` == 3 ~ "Overweight",
+      `_BMI5CAT` == 4 ~ "Obese",
+      TRUE ~ NA_character_
+    ),
+    
+    # 3. EXERANY2
+    `EXERANY2_recoded` = case_when(
+      EXERANY2 == 1 ~ "Yes",
+      EXERANY2 == 2 ~ "No",
+      TRUE ~ NA_character_
+    ),
+    
+    # 4. SMOKDAY2
+    `SMOKDAY2_recoded` = case_when(
+      SMOKDAY2 == 1 ~ "Every day",
+      SMOKDAY2 == 2 ~ "Some days",
+      SMOKDAY2 == 3 ~ "Not at all",
+      TRUE ~ NA_character_
+    ),
+    
+    # 5. _HLTHPLN
+    `_HLTHPLN_recoded` = case_when(
+      `_HLTHPLN` == 1 ~ "Have Health Insurance",
+      `_HLTHPLN` == 2 ~ "No Health Insurance",
+      TRUE ~ NA_character_
+    )
+  )
+# 6. Convert Age.Cat to a factor with specified levels 
+
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  mutate(
+`_AGEG5YR_recoded` = factor(`_AGEG5YR`,
+                             levels = c("18-24 years","25-34 years","35-44 years","45-54 years","55-64 years","65 years and older"),
+                             labels = c("18-24 years","25-34 years","35-44 years","45-54 years","55-64 years","65 years and older")))
+
+
+# Verify the changes for each variable
+list(
+  IMPRACE = table(BRFSS_2022_SmallPracticals_clean100$`_IMPRACE_recoded`, useNA = "ifany"),
+  BMI5CAT = table(BRFSS_2022_SmallPracticals_clean100$`_BMI5CAT_recoded`, useNA = "ifany"),
+  EXERANY2 = table(BRFSS_2022_SmallPracticals_clean100$`EXERANY2_recoded`, useNA = "ifany"),
+  SMOKDAY2 = table(BRFSS_2022_SmallPracticals_clean100$`SMOKDAY2_recoded`, useNA = "ifany"),
+  HLTHPLN = table(BRFSS_2022_SmallPracticals_clean100$`_HLTHPLN_recoded`, useNA = "ifany"),
+  AGEG5YR = table(BRFSS_2022_SmallPracticals_clean100$`_AGEG5YR_recoded`, useNA = "ifany")
+)
+```
+
+```{r}
+library(Hmisc)
+
+# Add labels to variables
+label(BRFSS_2022_SmallPracticals_clean100$`_AGEG5YR_recoded`) <- "Age Group"
+label(BRFSS_2022_SmallPracticals_clean100$DRNK3GE5_recoded) <- "Binge Drinking Level"
+label(BRFSS_2022_SmallPracticals_clean100$EXERANY2_recoded) <- "Exercise Participation"
+label(BRFSS_2022_SmallPracticals_clean100$`_HLTHPLN_recoded`) <- "Health Insurance Status"
+label(BRFSS_2022_SmallPracticals_clean100$`_SEX_recoded`) <- "Gender"
+label(BRFSS_2022_SmallPracticals_clean100$`_IMPRACE_recoded`) <- "Race/Ethnicity"
+label(BRFSS_2022_SmallPracticals_clean100$`_BMI5CAT_recoded`) <- "BMI Category"
+label(BRFSS_2022_SmallPracticals_clean100$SMOKDAY2_recoded) <- "Smoking Frequency"
+
+# Generate the descriptive table with labels
+library(table1)
+table1(~ `_AGEG5YR_recoded` + DRNK3GE5_recoded + EXERANY2_recoded + 
+         `_HLTHPLN_recoded` + `_SEX_recoded` + `_IMPRACE_recoded` + 
+         `_BMI5CAT_recoded` + SMOKDAY2_recoded, 
+       data = BRFSS_2022_SmallPracticals_clean100)
+```
+
+```{r}
+# Creating my analytic dataset from BRFSS_2022_SmallPracticals to BRFSS_2022_SmallPracticals_clean100 Figure 1  
+
+# Install DiagrammeR if not already installed
+if (!requireNamespace("DiagrammeR", quietly = TRUE)) {
+  install.packages("DiagrammeR")
+}
+
+library(DiagrammeR)
+
+# Create a flowchart with improved visibility for box colors
+DiagrammeR::grViz("
+digraph DataCleaningProcess {
+  graph [rankdir=TD, splines=ortho]
+
+  RawData [label='BRFSS_2022_SmallPracticals\\nSample Size: 445,132', shape=box, style=filled, fillcolor=lightgray, fontcolor=black]
+  CleanedData [label='BRFSS_2022_SmallPracticals_clean100\\nSample Size: 26,616', shape=box, style=filled, fillcolor=lightyellow, fontcolor=black]
+
+  RawData -> CleanedData [label='Data Cleaning Steps\\n(e.g., filtering, recoding, etc.)']
+}
+")
+
+
+```
+
+```{r}
+# Check the class of each variable
+class(BRFSS_2022_SmallPracticals_clean100$`_AGEG5YR_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`_SEX_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`_IMPRACE_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`_BMI5CAT_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`SMOKDAY2_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`_HLTHPLN_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`EXERANY2_recoded`)
+class(BRFSS_2022_SmallPracticals_clean100$`DRNK3GE5_recoded`)
+
+```
+
+```{r}
+# Convert variables to factor 
+
+library(dplyr)
+
+# Convert variables to factors
+BRFSS_2022_SmallPracticals_clean100 <- BRFSS_2022_SmallPracticals_clean100 %>%
+  mutate(
+    `_BMI5CAT_recoded` = factor(`_BMI5CAT_recoded`, 
+                                levels = c("Underweight", "Normal Weight", "Overweight", "Obese"), 
+                                ordered = TRUE),  # Make it an ordered factor
+    DRNK3GE5_recoded = factor(DRNK3GE5_recoded),
+    `_AGEG5YR_recoded` = factor(`_AGEG5YR_recoded`),
+    `_SEX_recoded` = factor(`_SEX_recoded`),
+    `_IMPRACE_recoded` = factor(`_IMPRACE_recoded`),
+    EXERANY2_recoded = factor(EXERANY2_recoded),
+    SMOKDAY2_recoded = factor(SMOKDAY2_recoded),
+    `_HLTHPLN_recoded` = factor(`_HLTHPLN_recoded`)
+  )
+
+summary(BRFSS_2022_SmallPracticals_clean100)
+```
+
+
+```{R}
+library(MASS)
+library(broom)
+library(dplyr)
+
+# Fit the ordinal logistic regression model2
+
+model_SmallPracticals_1 <- polr(`_BMI5CAT_recoded` ~ DRNK3GE5_recoded, data=BRFSS_2022_SmallPracticals_clean100) 
+summary(model_SmallPracticals_1)
+
+# Extract coefficients and calculate p-values
+
+tidy(model_SmallPracticals_1, exponentiate = TRUE, conf.int = TRUE) %>%
+  mutate(p.value = 2 * (1 - pnorm(abs(statistic))))
+
+# View the updated table
+model_SmallPracticals_1
+
+```
+
+-   **Ordinal Logistics Model2 Adjusted**
+
+```{r}
+# Fit the ordinal logistic regression model2
+
+model_SmallPracticals_2 <- polr(`_BMI5CAT_recoded` ~ DRNK3GE5_recoded + `_AGEG5YR_recoded` + `_SEX_recoded` + `_IMPRACE_recoded`+ EXERANY2_recoded, 
+  data = BRFSS_2022_SmallPracticals_clean100)
+
+# tidy(model_SmallPracticals_2, conf.int=TRUE, exponentiate = TRUE)
+
+# Tidy the model and add p-values
+tidy(model_SmallPracticals_2, exponentiate = TRUE, conf.int = TRUE) %>%
+  mutate(p.value = 2 * (1 - pnorm(abs(statistic))))
+
+# View the updated table
+model_SmallPracticals_2
+
+summary(BRFSS_2022_SmallPracticals_clean100)
+  
+```
+
+
+
+
+
+
+
+
+
