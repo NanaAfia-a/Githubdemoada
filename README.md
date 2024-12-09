@@ -16,7 +16,9 @@ R Packages (loaded via pacman):
 
 haven: For importing SPSS, Stata, or SAS data. readr: For reading tabular data. tidyverse: A collection of packages for data manipulation and visualization.
 
-naniar and VIM: For exploring and handling missing data. mice and lattice: For multiple imputations. table1: For creating descriptive tables.
+naniar and VIM: For exploring and handling missing data.
+
+mice and lattice: For multiple imputations. table1: For creating descriptive tables.
 
 DiagrammeR and rsvg: For visualizing flowcharts. dplyr: For data manipulation. car: For regression diagnostics.
 
