@@ -274,7 +274,7 @@ library(MASS)
 library(broom)
 library(dplyr)
 
-# Fit the ordinal logistic regression model2
+# Fit the ordinal logistic regression model1
 
 model_SmallPracticals_1 <- polr(`_BMI5CAT_recoded` ~ DRNK3GE5_recoded, data=BRFSS_2022_SmallPracticals_clean100) 
 summary(model_SmallPracticals_1)
